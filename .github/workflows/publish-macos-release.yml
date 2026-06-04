@@ -1,0 +1,50 @@
+name: Publish TextSync macOS Release
+
+on:
+  push:
+    branches:
+      - macos-release-v1.0
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release payload
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Publish macOS release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="1.0"
+          build="1"
+          tag="macos-v${version}-${build}"
+          latest_tag="latest-macos"
+          asset="TextSync-macOS-v${version}-universal.zip"
+
+          test -f "$asset"
+          test -f RELEASE_NOTES.md
+
+          git tag -f "$tag" "$GITHUB_SHA"
+          git tag -f "$latest_tag" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$tag" "refs/tags/$latest_tag"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "TextSync macOS ${version} (${build})" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "$tag" --title "TextSync macOS ${version} (${build})" --notes-file RELEASE_NOTES.md
+          fi
+          gh release upload "$tag" "$asset" --clobber
+
+          if gh release view "$latest_tag" >/dev/null 2>&1; then
+            gh release edit "$latest_tag" --title "Latest TextSync macOS" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "$latest_tag" --title "Latest TextSync macOS" --notes-file RELEASE_NOTES.md
+          fi
+          gh release upload "$latest_tag" "$asset" --clobber
